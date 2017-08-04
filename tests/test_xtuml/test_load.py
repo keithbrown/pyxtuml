@@ -175,6 +175,36 @@ class TestLoader(unittest.TestCase):
         val = m.select_any('X')
         self.assertTrue(val is not None)
         self.assertEqual(val.Id, "TE'ST")
+
+    @load_docstring
+    def test_insert_escaped_single_quot(self, m):
+        """
+        CREATE TABLE X (Id STRING);
+        INSERT INTO X VALUES ('''');
+        """
+        val = m.select_any('X')
+        self.assertTrue(val is not None)
+        self.assertEqual(val.Id, "'")
+        
+    @load_docstring
+    def test_insert_escaped_string_beginning(self, m):
+        """
+        CREATE TABLE X (Id STRING);
+        INSERT INTO X VALUES ('''TEST');
+        """
+        val = m.select_any('X')
+        self.assertTrue(val is not None)
+        self.assertEqual(val.Id, "'TEST")
+
+    @load_docstring
+    def test_insert_escaped_string_end(self, m):
+        """
+        CREATE TABLE X (Id STRING);
+        INSERT INTO X VALUES ('TEST''');
+        """
+        val = m.select_any('X')
+        self.assertTrue(val is not None)
+        self.assertEqual(val.Id, "TEST'")
         
     @load_docstring
     def test_insert_null_uuid(self, m):
@@ -194,7 +224,16 @@ class TestLoader(unittest.TestCase):
         '''
         val = m.select_any('X')
         self.assertEqual(0, val.Id)
-        
+
+    @load_docstring
+    def test_insert_integer_as_uuid(self, m):
+        '''
+        CREATE TABLE X (Id INTEGER);
+        INSERT INTO X VALUES ("00000000-0000-0000-0000-000000000000");
+        '''
+        val = m.select_any('X')
+        self.assertEqual(0, val.Id)
+
     @load_docstring
     def test_insert_positive_real(self, m):
         '''

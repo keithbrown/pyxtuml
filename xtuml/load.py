@@ -70,7 +70,7 @@ def deserialize_value(ty, value):
         elif value.upper() == 'TRUE':
             return True
         else:
-            raise ParsingException("Unable to convert '%s' to a boolean" % value)
+            return None
     
     elif uty == 'INTEGER': 
         if '"' in value:
@@ -82,16 +82,13 @@ def deserialize_value(ty, value):
         return float(value)
     
     elif uty == 'STRING': 
-        return value.replace("''", "'")[1:-1]
+        return value[1:-1].replace("''", "'")
     
     elif uty == 'UNIQUE_ID': 
         if '"' in value:
             return uuid.UUID(value[1:-1]).int
         else:
             return int(value)
-    
-    else:
-        raise ParsingException("Unknown type named '%s'" % ty)
 
     
 class ParsingException(Exception):
@@ -101,7 +98,13 @@ class ParsingException(Exception):
     pass
 
 
-class CreateInstanceStmt(object):
+class Stmt(object):
+    offset = None
+    lineno = None
+    filename = None
+
+
+class CreateInstanceStmt(Stmt):
     
     def __init__(self, kind, values, names):
         self.kind = kind
@@ -109,14 +112,14 @@ class CreateInstanceStmt(object):
         self.names = names
 
 
-class CreateClassStmt(object):
+class CreateClassStmt(Stmt):
     
     def __init__(self, kind, attributes):
         self.kind = kind
         self.attributes = attributes
         
 
-class CreateAssociationStmt(object):
+class CreateAssociationStmt(Stmt):
     def __init__(self, rel_id, source_kind, source_cardinality, source_keys, 
                  source_phrase, target_kind, target_cardinality, target_keys,
                 target_phrase):
@@ -131,7 +134,7 @@ class CreateAssociationStmt(object):
         self.target_phrase = target_phrase
         
  
-class CreateUniqueStmt(object):
+class CreateUniqueStmt(Stmt):
     
     def __init__(self, kind, name, attributes):
         self.kind = kind
@@ -209,12 +212,6 @@ class ModelLoader(object):
                                 module=self,
                                 outputdir=os.path.dirname(__file__),
                                 tabmodule='xtuml.__xtuml_parsetab')
-
-    def build_parser(self):
-        '''
-        This method is deprecated.
-        '''
-        pass
     
     def dontWarnInsertMismatch(self):
         self.quietInsertMismatch = True
@@ -232,7 +229,7 @@ class ModelLoader(object):
                         lextab="xtuml.__xtuml_lextab")
         lexer.filename = name
         logger.debug('parsing %s' % name)
-        s = self.parser.parse(lexer=lexer, input=data)
+        s = self.parser.parse(lexer=lexer, input=data, tracking=1)
         self.statements.extend(s)
 
     def filename_input(self, filename):
@@ -317,14 +314,20 @@ class ModelLoader(object):
         metaclass = metamodel.find_metaclass(stmt.kind)
         if not quietInsertMismatchWarning:
             if len(metaclass.attributes) != len(stmt.values):
-                logger.warn('schema mismatch while loading an instance of %s',
-                            stmt.kind)
+                logger.warn('%s:%d:schema mismatch' % (stmt.filename, stmt.lineno))
                 
         inst = metamodel.new(stmt.kind)
         for attr, value in zip(metaclass.attributes, stmt.values):
             name, ty = attr
-            value = deserialize_value(ty, value)
-            inst.__dict__[name] = value
+            py_value = deserialize_value(ty, value)
+            if py_value is None:
+                raise ParsingException("%s:%d:unable to deserialize "\
+                                       "%s to a %s" % (stmt.filename,
+                                                       stmt.lineno,
+                                                       value,
+                                                       ty))
+
+            inst.__dict__[name] = py_value
         
         return inst
     
@@ -345,8 +348,7 @@ class ModelLoader(object):
         
         if not quietInsertMismatchWarning:
             if set(inst_unames) - set(schema_unames):
-                logger.warn('schema mismatch while loading an instance of %s',
-                            stmt.kind)
+                logger.warn('%s:%d:schema mismatch' % (stmt.filename, stmt.lineno))
             
         inst = metamodel.new(stmt.kind)
         for name, ty in metaclass.attributes:
@@ -354,6 +356,12 @@ class ModelLoader(object):
             if uname in inst_unames:
                 idx = inst_unames.index(uname)
                 value = deserialize_value(ty, stmt.values[idx])
+                if value is None:
+                    raise ParsingException("%s:%d:unable to deserialize "\
+                                           "%s to a %s" % (stmt.filename,
+                                                           stmt.lineno,
+                                                           value,
+                                                           ty))
             else:
                 value = None
             
@@ -375,7 +383,7 @@ class ModelLoader(object):
             else:
                 fn = self._populate_instance_with_positional_arguments
             
-            inst = fn(metamodel, stmt, self.quietInsertMismatch)
+            fn(metamodel, stmt, self.quietInsertMismatch)
     
     def populate_connections(self, metamodel):
         '''
@@ -415,7 +423,8 @@ class ModelLoader(object):
                     ass.target_link.connect(inst, other_inst, check=False)
 
         for inst in metamodel.instances:
-            for attr in inst.__metaclass__.referential_attributes:
+            metaclass = xtuml.get_metaclass(inst)
+            for attr in metaclass.referential_attributes:
                 if attr in inst.__dict__:
                     delattr(inst, attr)
 
@@ -542,6 +551,9 @@ class ModelLoader(object):
                   | create_index_statement SEMICOLON
         '''
         p[0] = p[1]
+        p[0].offset = p.lexpos(1)
+        p[0].lineno = p.lineno(1)
+        p[0].filename = p.lexer.filename
 
     def p_create_table_statement(self, p):
         '''create_table_statement : CREATE TABLE identifier LPAREN attribute_sequence RPAREN'''

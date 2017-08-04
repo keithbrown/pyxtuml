@@ -113,12 +113,12 @@ def build_enum_type(s_edt):
     enum = ET.Element('xs:simpleType', name=s_dt.name)
     enum_list = ET.SubElement(enum, 'xs:restriction', base='xs:string')
     
-    first_filter = lambda selected: not nav_one(selected).S_ENUM[56, 'precedes']()
+    first_filter = lambda selected: not nav_one(selected).S_ENUM[56, 'succeeds']()
     
     s_enum = nav_any(s_edt).S_ENUM[27](first_filter)
     while s_enum:
         ET.SubElement(enum_list, 'xs:enumeration', value=s_enum.name)
-        s_enum = nav_one(s_enum).S_ENUM[56, 'succeeds']()
+        s_enum = nav_one(s_enum).S_ENUM[56, 'precedes']()
     
     return enum
 
@@ -130,14 +130,14 @@ def build_struct_type(s_sdt):
     s_dt = nav_one(s_sdt).S_DT[17]()
     struct = ET.Element('xs:complexType', name=s_dt.name)
     
-    first_filter = lambda selected: not nav_one(selected).S_MBR[46, 'precedes']()
+    first_filter = lambda selected: not nav_one(selected).S_MBR[46, 'succeeds']()
     
     s_mbr = nav_any(s_sdt).S_MBR[44](first_filter)
     while s_mbr:
         s_dt = nav_one(s_mbr).S_DT[45]()
         type_name = get_type_name(s_dt)
         ET.SubElement(struct, 'xs:attribute', name=s_mbr.name, type=type_name)
-        s_mbr = nav_one(s_mbr).S_MBR[46, 'succeeds']()
+        s_mbr = nav_one(s_mbr).S_MBR[46, 'precedes']()
     
     return struct
 
@@ -249,7 +249,7 @@ def prettify(xml_string):
     return reparsed.toprettyxml(indent="    ")
 
 
-def main():
+def main(args):
     
     parser = optparse.OptionParser(usage="%prog [options] <model_path> [another_model_path...]",
                                    version=xtuml.version.complete_string,
@@ -268,7 +268,7 @@ def main():
     parser.add_option("-v", "--verbosity", dest='verbosity', action="count", 
                       help="increase debug logging level", default=2)
     
-    (opts, args) = parser.parse_args()
+    (opts, args) = parser.parse_args(args)
     if len(args) == 0 or None in [opts.component, opts.output]:
         parser.print_help()
         sys.exit(1)
@@ -297,5 +297,5 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    main(sys.argv[1:])
     

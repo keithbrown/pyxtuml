@@ -55,6 +55,12 @@ class TestModel(unittest.TestCase):
         q = m.select_many('S_EDT')
         self.assertIsInstance(q, xtuml.QuerySet)
         self.assertTrue(len(q) == 0)
+
+    def test_navigate_many_where(self):
+        m = self.metamodel
+        s_cdt = m.select_many('S_CDT')
+        c_dt = xtuml.navigate_many(s_cdt).S_DT[17](where(Name='integer'))
+        self.assertEqual(1, len(c_dt))
         
     def test_select_any_where(self):
         m = self.metamodel
@@ -148,7 +154,7 @@ class TestModel(unittest.TestCase):
         ass.batch_relate()
         ass.formalize()
             
-        self.assertTrue(xtuml.navigate_one(inst).aa[1, 'prev'].AA[1, 'prev']())
+        self.assertTrue(xtuml.navigate_one(inst).aa[1, 'next'].AA[1, 'next']())
         
     def test_unknown_type(self):
         self.metamodel.define_class('A', [('Id', '<invalid type>')])
@@ -173,7 +179,10 @@ class TestModel(unittest.TestCase):
         
     def test_delete(self):
         inst = self.metamodel.select_any('S_DT', where(Name='void'))
+        self.assertTrue(xtuml.navigate_one(inst).PE_PE[8001]())
+        
         xtuml.delete(inst)
+        self.assertFalse(xtuml.navigate_one(inst).PE_PE[8001]())
         
         inst = self.metamodel.select_any('S_DT', where(Name='void'))
         self.assertFalse(inst)
@@ -246,16 +255,16 @@ class TestDefineAssociations(unittest.TestCase):
 
         self.assertTrue(xtuml.relate(first, second, 1, 'prev'))
 
-        inst = xtuml.navigate_one(first).A[1, 'next']()
+        inst = xtuml.navigate_one(first).A[1, 'prev']()
         self.assertEqual(inst.Name, second.Name)
 
-        inst = xtuml.navigate_one(first).A[1, 'prev']()
+        inst = xtuml.navigate_one(first).A[1, 'next']()
         self.assertIsNone(inst)
         
-        inst = xtuml.navigate_one(second).A[1, 'prev']()
+        inst = xtuml.navigate_one(second).A[1, 'next']()
         self.assertEqual(inst.Name, first.Name)
         
-        inst = xtuml.navigate_one(second).A[1, 'next']()
+        inst = xtuml.navigate_one(second).A[1, 'prev']()
         self.assertIsNone(inst)
 
     def test_one_to_many(self):

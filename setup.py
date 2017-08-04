@@ -29,9 +29,6 @@ except ImportError:
     from distutils.core  import Command
     from distutils.command.build_py import build_py
 
-import xtuml
-from bridgepoint import oal
-
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -39,6 +36,9 @@ logging.basicConfig(level=logging.DEBUG)
 class BuildCommand(build_py):
     
     def run(self):
+        import xtuml
+        from bridgepoint import oal
+
         l = xtuml.ModelLoader()
         l.input('', name='<empty string>')
         l.build_metamodel()
@@ -69,7 +69,7 @@ class TestCommand(Command):
 
 
 setup(name='pyxtuml',
-      version=xtuml.version.release,
+      version='2.0b1', # ensure that this is the same as in xtuml.version
       description='Library for parsing, manipulating, and generating BridgePoint xtUML models',
       author='John Törnblom',
       author_email='john.tornblom@gmail.com',
@@ -82,10 +82,13 @@ setup(name='pyxtuml',
           'Topic :: Software Development :: Compilers',
           'License :: OSI Approved :: GNU Lesser General Public License v3 or later (LGPLv3+)',
           'Programming Language :: Python :: 2.7',
-          'Programming Language :: Python :: 3.5'],
+          'Programming Language :: Python :: 3.5',
+          'Programming Language :: Python :: 3.6'],
       keywords='xtuml bridgepoint',
       packages=['xtuml', 'bridgepoint'],
       requires=['ply'],
+      install_requires=['ply'],
+      setup_requires=['ply'],
       cmdclass={'build_py': BuildCommand,
                 'test': TestCommand}
       )
